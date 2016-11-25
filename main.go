@@ -4,6 +4,7 @@ import (
 	"github.com/reivaj05/url_shortener/shortener"
 
 	"github.com/reivaj05/GoConfig"
+	"github.com/reivaj05/GoDB"
 	"github.com/reivaj05/GoLogger"
 	"github.com/reivaj05/GoServer"
 )
@@ -20,6 +21,7 @@ func main() {
 func setup() {
 	startConfig()
 	startLogger()
+	startDB()
 }
 
 func startConfig() {
@@ -52,6 +54,26 @@ func createLoggerOptions() *GoLogger.LoggerOptions {
 		Path:       "log/",
 		LogLevel:   getLogLevel(),
 	}
+}
+
+func startDB() {
+	if err := GoDB.Init(createDBOptions(), retrieveModels()...); err != nil {
+		finishExecution("Error while loading db", map[string]interface{}{
+			"error": err.Error(),
+		})
+	}
+}
+
+func createDBOptions() *GoDB.DBOptions {
+	return &GoDB.DBOptions{
+		DBEngine: "sqlite3",
+		DBName:   "url_shortener.db",
+	}
+}
+
+func retrieveModels() (models []interface{}) {
+	models = append(models, shortener.Models...)
+	return
 }
 
 func getLogLevel() int {
