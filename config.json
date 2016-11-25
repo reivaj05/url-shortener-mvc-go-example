@@ -1,0 +1,6 @@
+{
+	"logLevel": "INFO",
+	"port": "8000",
+	"dbAddress": "localhost",
+	"dbPort": "6379"
+}
