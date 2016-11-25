@@ -1,0 +1,4 @@
+*.coverprofile
+log/
+*.log
+*.db
