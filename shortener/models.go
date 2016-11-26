@@ -7,8 +7,8 @@ import (
 
 type URLShortModel struct {
 	gorm.Model
-	LongURL  string
-	ShortURL string
+	LongURL  string `gorm:"type:varchar(100);not null;unique"`
+	ShortURL string `gorm:"type:varchar(100);not null;unique"`
 }
 
 func (instance *URLShortModel) ToJSON() *GoJSON.JSONWrapper {
