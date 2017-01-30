@@ -11,8 +11,9 @@ var Endpoints = []*GoServer.Endpoint{
 		Handler: getListHandler,
 	},
 	&GoServer.Endpoint{
-		Method:  "GET",
-		Path:    "/shortener/{id:[0-9]+}",
+		Method: "GET",
+		// Path:    "/shortener/{id:[0-9]+}",
+		Path:    "/shortener/{shortUrl}",
 		Handler: getItemHandler,
 	},
 	&GoServer.Endpoint{

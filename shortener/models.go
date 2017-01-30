@@ -1,14 +1,17 @@
 package shortener
 
 import (
-	"github.com/jinzhu/gorm"
+	"time"
+
 	"github.com/reivaj05/GoJSON"
 )
 
 type URLShortModel struct {
-	gorm.Model
-	LongURL  string `gorm:"type:varchar(100);not null;unique"`
-	ShortURL string `gorm:"type:varchar(100);not null;unique"`
+	ID        uint `gorm:"primary_key"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	LongURL   string `gorm:"type:varchar(100);not null;unique"`
+	ShortURL  string `gorm:"type:varchar(100);not null;unique"`
 }
 
 func (instance *URLShortModel) ToJSON() *GoJSON.JSONWrapper {

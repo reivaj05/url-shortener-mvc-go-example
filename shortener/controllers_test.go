@@ -43,8 +43,10 @@ func (suite *ControllersTestSuite) TearDownTest() {
 func createTestRouter() *mux.Router {
 	router := mux.NewRouter()
 	router.Methods("GET").Path("/shortener/").HandlerFunc(getListHandler)
-	router.Methods("GET").Path("/shortener/{id:[0-9]+}").HandlerFunc(getItemHandler)
+	router.Methods("GET").Path("/shortener/{shortUrl}").HandlerFunc(getItemHandler)
 	router.Methods("POST").Path("/shortener/").HandlerFunc(postItemhandler)
+	router.Methods("PUT").Path("/shortener/{id:[0-9]+}").HandlerFunc(putItemHandler)
+	router.Methods("DELETE").Path("/shortener/{id:[0-9]+}").HandlerFunc(deleteItemHandler)
 	return router
 }
 
@@ -61,18 +63,18 @@ func (suite *ControllersTestSuite) TestGetListHandler() {
 }
 
 func (suite *ControllersTestSuite) TestGetItemHandler() {
-	suite.dbClient.Create(&URLShortModel{})
-	_, status := suite.makeRequest("GET", "http://localhost/shortener/1", nil)
+	suite.dbClient.Create(&URLShortModel{ShortURL: "short"})
+	_, status := suite.makeRequest("GET", "http://localhost/shortener/short", nil)
 	suite.assert.Equal(http.StatusOK, status)
 }
 
 func (suite *ControllersTestSuite) TestGetItemHandlerNotFound() {
-	_, status := suite.makeRequest("GET", "http://localhost/shortener/1", nil)
+	_, status := suite.makeRequest("GET", "http://localhost/shortener/short", nil)
 	suite.assert.Equal(http.StatusNotFound, status)
 }
 
 func (suite *ControllersTestSuite) TestPostItemHandler() {
-	const body = `{"longURL": "http://www.example.com"}`
+	const body = `{"longUrl": "http://www.example.com"}`
 	_, status := suite.makeRequest("POST", "http://localhost/shortener/", []byte(body))
 	suite.assert.Equal(http.StatusCreated, status)
 }
@@ -88,15 +90,55 @@ func (suite *ControllersTestSuite) TestPostItemHandlerWithoutCorrectFields() {
 }
 
 func (suite *ControllersTestSuite) TestPostItemHandlerWithInvalidData() {
-	const body = `{"longURL": "not a url"}`
+	const body = `{"longUrl": "not a url"}`
 	_, status := suite.makeRequest("POST", "http://localhost/shortener/", []byte(body))
 	suite.assert.Equal(http.StatusBadRequest, status)
 }
 
 func (suite *ControllersTestSuite) TestPostItemHandlerWithRepeatedData() {
 	suite.dbClient.Create(&URLShortModel{LongURL: "http://www.example.com", ShortURL: ""})
-	const body = `{"longURL": "http://www.example.com"}`
+	const body = `{"longUrl": "http://www.example.com"}`
 	_, status := suite.makeRequest("POST", "http://localhost/shortener/", []byte(body))
+	suite.assert.Equal(http.StatusInternalServerError, status)
+}
+
+func (suite *ControllersTestSuite) TestPutItemHandler() {
+	suite.dbClient.Create(&URLShortModel{LongURL: "long", ShortURL: "short"})
+	const body = `{"longUrl": "http://www.example.com"}`
+	_, status := suite.makeRequest("PUT", "http://localhost/shortener/1", []byte(body))
+	suite.assert.Equal(http.StatusOK, status)
+}
+
+func (suite *ControllersTestSuite) TestPutItemHandlerWithWrongJSON() {
+	_, status := suite.makeRequest("PUT", "http://localhost/shortener/1", []byte(""))
+	suite.assert.Equal(http.StatusBadRequest, status)
+}
+
+func (suite *ControllersTestSuite) TestPutItemHandlerWithoutCorrectFields() {
+	_, status := suite.makeRequest("PUT", "http://localhost/shortener/1", []byte("{}"))
+	suite.assert.Equal(http.StatusBadRequest, status)
+}
+
+func (suite *ControllersTestSuite) TestPutItemHandlerWithInvalidData() {
+	const body = `{"longUrl": "not a url"}`
+	_, status := suite.makeRequest("PUT", "http://localhost/shortener/1", []byte(body))
+	suite.assert.Equal(http.StatusBadRequest, status)
+}
+
+func (suite *ControllersTestSuite) TestPutItemHandlerWrongURLID() {
+	const body = `{"longUrl": "http://www.example.com"}`
+	_, status := suite.makeRequest("PUT", "http://localhost/shortener/1", []byte(body))
+	suite.assert.Equal(http.StatusInternalServerError, status)
+}
+
+func (suite *ControllersTestSuite) TestDeleteItemHandler() {
+	suite.dbClient.Create(&URLShortModel{LongURL: "http://www.example.com", ShortURL: ""})
+	_, status := suite.makeRequest("DELETE", "http://localhost/shortener/1", []byte(""))
+	suite.assert.Equal(http.StatusOK, status)
+}
+
+func (suite *ControllersTestSuite) TestDeleteItemHandlerWrongURLID() {
+	_, status := suite.makeRequest("DELETE", "http://localhost/shortener/1", []byte(""))
 	suite.assert.Equal(http.StatusInternalServerError, status)
 }
 

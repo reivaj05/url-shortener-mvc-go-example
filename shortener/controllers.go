@@ -23,7 +23,7 @@ func getListHandler(rw http.ResponseWriter, req *http.Request) {
 
 func createJSONResponse(list []URLShortModel) string {
 	json, _ := GoJSON.New("{}")
-	json.CreateJSONArrayAtPath("data", convertListToJSON(list))
+	json.CreateJSONArrayAtPathWithArray("data", convertListToJSON(list))
 	return json.ToString()
 }
 
@@ -38,8 +38,10 @@ func getItemHandler(rw http.ResponseWriter, req *http.Request) {
 	var urlShortInstance URLShortModel
 	dbClient := GoDB.GetDBClient()
 	params := GoServer.GetQueryParams(req)
-	id, _ := strconv.Atoi(params["id"])
-	if err := dbClient.Get(&urlShortInstance, id); err != nil {
+	shortURL := params["shortUrl"]
+	if err := dbClient.GetWhere(
+		&urlShortInstance, "short_url", shortURL); err != nil {
+
 		GoServer.SendResponseWithStatus(
 			rw, GoServer.ResourceNotFound, http.StatusNotFound)
 		return
@@ -58,12 +60,35 @@ func postItemhandler(rw http.ResponseWriter, req *http.Request) {
 		sendBadRequestResponse(rw)
 		return
 	}
-	if err := saveDataIntoDB(data); err != nil {
+	item, err := saveDataIntoDB(data)
+	if err != nil {
 		GoServer.SendResponseWithStatus(rw, "", http.StatusInternalServerError)
 		return
 	}
 	GoServer.SendResponseWithStatus(
-		rw, GoServer.ResourceCreated, http.StatusCreated)
+		rw, item.ToJSON().ToString(), http.StatusCreated)
+}
+
+func putItemHandler(rw http.ResponseWriter, req *http.Request) {
+	data, err := getJSONData(req)
+	if err != nil {
+		sendBadRequestResponse(rw)
+		return
+	}
+	params := GoServer.GetQueryParams(req)
+	id, _ := strconv.Atoi(params["id"])
+	if !isDataValid(data) {
+		sendBadRequestResponse(rw)
+		return
+	}
+	data.SetValueAtPath("id", id)
+	item, err := saveDataIntoDB(data)
+	if err != nil {
+		GoServer.SendResponseWithStatus(rw, "", http.StatusInternalServerError)
+		return
+	}
+	GoServer.SendResponseWithStatus(
+		rw, item.ToJSON().ToString(), http.StatusOK)
 }
 
 func getJSONData(req *http.Request) (data *GoJSON.JSONWrapper, err error) {
@@ -73,8 +98,8 @@ func getJSONData(req *http.Request) (data *GoJSON.JSONWrapper, err error) {
 }
 
 func isDataValid(data *GoJSON.JSONWrapper) bool {
-	if data.HasPath("longURL") {
-		if longURL, ok := data.GetStringFromPath("longURL"); ok {
+	if data.HasPath("longUrl") {
+		if longURL, ok := data.GetStringFromPath("longUrl"); ok {
 			return isURLValid(longURL)
 		}
 	}
@@ -91,28 +116,60 @@ func sendBadRequestResponse(rw http.ResponseWriter) {
 		rw, GoServer.BadRequest, http.StatusBadRequest)
 }
 
-func saveDataIntoDB(data *GoJSON.JSONWrapper) error {
-	longURL, _ := data.GetStringFromPath("longURL")
+func saveDataIntoDB(data *GoJSON.JSONWrapper) (*URLShortModel, error) {
+	longURL, _ := data.GetStringFromPath("longUrl")
 	shortURL := createShortURL(longURL)
 	dbClient := GoDB.GetDBClient()
-	return dbClient.Create(&URLShortModel{
+	if data.HasPath("id") {
+		id, _ := data.GetIntFromPath("id")
+		return updateURL(longURL, shortURL, id, dbClient)
+	}
+	return createURL(longURL, shortURL, dbClient)
+}
+
+func updateURL(longURL, shortURL string, id int,
+	dbClient *GoDB.DBClient) (*URLShortModel, error) {
+
+	var item URLShortModel
+	if err := dbClient.Get(&item, id); err != nil {
+		return nil, err
+	}
+	item.LongURL = longURL
+	item.ShortURL = shortURL
+	return &item, dbClient.Update(&item)
+}
+
+func createURL(longURL, shortURL string,
+	dbClient *GoDB.DBClient) (*URLShortModel, error) {
+
+	item := URLShortModel{
 		LongURL:  longURL,
 		ShortURL: shortURL,
-	})
+	}
+	return &item, dbClient.Create(&item)
 }
 
 func createShortURL(longURL string) string {
 	// TODO: create short_url
 	// TODO: check if longURL exists and send appropiate response
-	return "short_url_of: " + longURL
-}
-
-func putItemHandler(rw http.ResponseWriter, req *http.Request) {
-	GoServer.SendResponseWithStatus(
-		rw, `{"msg": "implement put"}`, http.StatusOK)
+	return longURL
 }
 
 func deleteItemHandler(rw http.ResponseWriter, req *http.Request) {
-	GoServer.SendResponseWithStatus(
-		rw, `{"msg": "implement delete"}`, http.StatusOK)
+	params := GoServer.GetQueryParams(req)
+	id, _ := strconv.Atoi(params["id"])
+	var url URLShortModel
+	dbClient := GoDB.GetDBClient()
+	notDeletedMsg := `{"error": "The resource was not deleted"}`
+	if err := dbClient.Get(&url, id); err != nil {
+		GoServer.SendResponseWithStatus(rw, GoServer.ResourceNotFound,
+			http.StatusInternalServerError)
+		return
+	}
+	if err := dbClient.Delete(&url); err != nil {
+		GoServer.SendResponseWithStatus(rw, notDeletedMsg,
+			http.StatusInternalServerError)
+		return
+	}
+	GoServer.SendResponseWithStatus(rw, "", http.StatusOK)
 }

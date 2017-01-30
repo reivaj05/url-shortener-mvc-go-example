@@ -1,0 +1,20 @@
+# Branches matching this clause will trigger a build in circleci:
+general:
+  branches:
+    only:
+      - master
+      - staging
+      - dev
+
+machine:
+  services:
+    - docker
+
+dependencies:
+  override:
+    - docker login -e $CIRCLE_USERNAME@bottlenose.com -u $DOCKER_USER -p $DOCKER_PASS docker.bottlenose.com
+
+# We use this circleci stage to build our docker container:
+test:
+  override:
+    - docker build -t $CIRCLE_PROJECT_REPONAME:$CIRCLE_SHA1 .
